@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>すりあわせ</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .time-bar {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .time-slot {
+            flex: 1 0 10%;
+            padding: 10px;
+            margin: 2px;
+            background-color: #f0f0f0;
+            cursor: pointer;
+            text-align: center;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .time-slot.selected {
+            background-color: #87ceeb;
+        }
+
+        .output {
+            margin-top: 20px;
+            width: 100%;
+            height: 250px;
+            white-space: pre-line;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+
+        .copy-btn {
+            margin-top: 10px;
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .copy-btn:disabled {
+            background-color: grey;
+        }
+
+        .reset-btn {
+            flex: 1 0 100%;
+            padding: 10px;
+            margin: 2px;
+            background-color: pink;
+            cursor: pointer;
+            text-align: center;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>名前を入力後、カレンダーと時間帯を選択してください</h2>
+    <label for="name">名前:</label>
+    <input type="text" id="name" placeholder="名前を入力" oninput="appendOutput()">
+    <br>
+
+    <label for="date">日付:</label>
+    <input type="date" id="date" onchange="appendOutput()">
+    <br>
+
+    <div class="time-bar" id="time-bar"></div>
+
+    <textarea class="output" id="output" contenteditable="true"></textarea>
+    <button class="copy-btn" id="copy-btn" disabled>コピー</button>
+    <div class="error" id="error"></div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            const timeBar = $('#time-bar');
+            const output = $('#output');
+            const copyBtn = $('#copy-btn');
+            const error = $('#error');
+            const resetBtn = $('<div class="reset-btn">Reset</div>');
+
+            let nameFlag = false;
+
+            $('#date').change(function () {
+                selectedStart = null;
+                selectedEnd = null;
+                $('.time-slot').removeClass('selected');
+                appendOutput();
+            });
+
+            // Create time slots from 0:00 to 24:00
+            for (let i = 0; i <= 24; i++) {
+                let timeSlot = $('<div class="time-slot">' + i + ':00</div>');
+                timeSlot.data('hour', i);
+                timeBar.append(timeSlot);
+            }
+            timeBar.append(resetBtn);
+
+            // Handle time slot selection
+            let selectedStart = null;
+            let selectedEnd = null;
+
+            $('.time-slot').click(function () {
+                let hour = $(this).data('hour');
+
+                if (selectedStart === null || selectedEnd !== null) {
+                    selectedStart = hour;
+                    selectedEnd = null;
+                    $('.time-slot').removeClass('selected');
+                    $(this).addClass('selected');
+                } else if (hour > selectedStart) {
+                    selectedEnd = hour;
+                    for (let i = selectedStart; i <= selectedEnd; i++) {
+                        $('.time-slot').eq(i).addClass('selected');
+                    }
+                } else {
+                    // Swap start and end if the selected time is earlier
+                    selectedStart = null;
+                    selectedEnd = null;
+                    $('.time-slot').removeClass('selected');
+                }
+                appendOutput();
+            });
+
+            // Reset selected time slots
+            resetBtn.click(function () {
+                selectedStart = null;
+                selectedEnd = null;
+                $('.time-slot').removeClass('selected');
+                appendOutput();
+            });
+
+
+            // Append to the formatted text
+            function appendOutput() {
+                let name = $('#name').val();
+                let date = $('#date').val();
+                let dayOfWeek = new Date(date).toLocaleDateString('ja-JP', { weekday: 'short' });
+
+                if (!name) {
+                    copyBtn.prop('disabled', true);
+                    error.text('名前を入力してください');
+                } else if (!date) {
+                    copyBtn.prop('disabled', true);
+                    error.text('日付を選択してください');
+                } else {
+                    error.text('');
+                    copyBtn.prop('disabled', false);
+
+                    let text = '';
+                    if (selectedStart !== null && selectedEnd !== null) {
+                        for (let i = selectedStart; i < selectedEnd; i++) {
+                            if (!nameFlag) {
+                                text += `${name}\n`;
+                                text += '--------------------------------\n';
+                                nameFlag = true;
+                            }
+                            text += `${date}(${dayOfWeek}) ${i}:00~${i + 1}:00\n`;
+                        }
+                    }
+                    output.val(output.val() + text);
+                }
+            }
+
+            // Copy text to clipboard
+            copyBtn.click(function () {
+                if (!$('#name').val()) {
+                    error.text('名前を入力してください');
+                    return;
+                }
+                if (!$('#date').val()) {
+                    error.text('日付を選択してください');
+                    return;
+                }
+                error.text('');
+                navigator.clipboard.writeText(output.val());
+                // Show success message
+                copyBtn.text('コピーしました');
+                setTimeout(() => {
+                    copyBtn.text('コピー');
+                }, 3000);
+            });
+        });
+    </script>
+</body>
+
+</html>
