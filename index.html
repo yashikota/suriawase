@@ -11,6 +11,13 @@
             margin: 20px;
         }
 
+        input {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
         .time-bar {
             display: flex;
             flex-wrap: wrap;
@@ -35,7 +42,7 @@
         .output {
             margin-top: 20px;
             width: 100%;
-            height: 250px;
+            height: 350px;
             white-space: pre-line;
             border: 1px solid #ccc;
             border-radius: 5px;
@@ -73,6 +80,42 @@
             color: red;
             margin-top: 10px;
         }
+
+        .schedule-input {
+            margin-top: 20px;
+            width: 100%;
+            height: 350px;
+            white-space: pre-line;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+
+        .threshold-container {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .threshold-container label {
+            margin-right: 10px;
+        }
+
+        .threshold-container input {
+            width: 50px;
+        }
+
+        .sync-btn {
+            margin-top: 10px;
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
     </style>
 </head>
 
@@ -82,8 +125,13 @@
     <input type="text" id="name" placeholder="名前を入力" oninput="appendOutput()">
     <br>
 
-    <label for="date">日付:</label>
-    <input type="date" id="date" onchange="appendOutput()">
+    <div style="display: flex; align-items: center;">
+        <label for="date">日付:</label>
+        <input type="date" id="date" onchange="appendOverlap()">
+        <button type="button" id="date-decrease">ー</button>
+        <div style="width: 10px;"></div>
+        <button type="button" id="date-increase">＋</button>
+    </div>
     <br>
 
     <div class="time-bar" id="time-bar"></div>
@@ -92,29 +140,50 @@
     <button class="copy-btn" id="copy-btn" disabled>コピー</button>
     <div class="error" id="error"></div>
 
+    <br>
+    <hr>
+
+    <h2>複数人の予定を入力後、すりあわせボタンを押してください</h2>
+
+    <div class="threshold-container">
+        <input type="number" id="threshold" value="2" min="2" onchange="appendOverlap()">
+        <label for="threshold">人以上</label>
+    </div>
+
+    <textarea class="schedule-input" id="schedule-input" contenteditable="true"></textarea>
+    <button class="sync-btn" id="sync-btn">すりあわせ</button>
+
+    <textarea class="output" id="output2" contenteditable="true"></textarea>
+    <button class="copy-btn" id="copy-btn" disabled>コピー</button>
+
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
     <script>
         $(document).ready(function () {
-            const timeBar = $('#time-bar');
-            const output = $('#output');
-            const copyBtn = $('#copy-btn');
-            const error = $('#error');
-            const resetBtn = $('<div class="reset-btn">Reset</div>');
+            const timeBar = $("#time-bar");
+            const output = $("#output");
+            const copyBtn = $("#copy-btn");
+            const error = $("#error");
+            const resetBtn = $("<div class='reset-btn'>Reset</div>");
 
             let nameFlag = false;
 
-            $('#date').change(function () {
+            $("#name").on("input", function () {
+                $(".time-slot").removeClass("selected");
+                appendOutput();
+            });
+
+            $("#date").change(function () {
                 selectedStart = null;
                 selectedEnd = null;
-                $('.time-slot').removeClass('selected');
+                $(".time-slot").removeClass("selected");
                 appendOutput();
             });
 
             // Create time slots from 0:00 to 24:00
             for (let i = 0; i <= 24; i++) {
-                let timeSlot = $('<div class="time-slot">' + i + ':00</div>');
-                timeSlot.data('hour', i);
+                let timeSlot = $("<div class='time-slot'>" + i + ":00</div>");
+                timeSlot.data("hour", i);
                 timeBar.append(timeSlot);
             }
             timeBar.append(resetBtn);
@@ -123,24 +192,24 @@
             let selectedStart = null;
             let selectedEnd = null;
 
-            $('.time-slot').click(function () {
-                let hour = $(this).data('hour');
+            $(".time-slot").click(function () {
+                let hour = $(this).data("hour");
 
                 if (selectedStart === null || selectedEnd !== null) {
                     selectedStart = hour;
                     selectedEnd = null;
-                    $('.time-slot').removeClass('selected');
-                    $(this).addClass('selected');
+                    $(".time-slot").removeClass("selected");
+                    $(this).addClass("selected");
                 } else if (hour > selectedStart) {
                     selectedEnd = hour;
                     for (let i = selectedStart; i <= selectedEnd; i++) {
-                        $('.time-slot').eq(i).addClass('selected');
+                        $(".time-slot").eq(i).addClass("selected");
                     }
                 } else {
                     // Swap start and end if the selected time is earlier
                     selectedStart = null;
                     selectedEnd = null;
-                    $('.time-slot').removeClass('selected');
+                    $(".time-slot").removeClass("selected");
                 }
                 appendOutput();
             });
@@ -149,33 +218,55 @@
             resetBtn.click(function () {
                 selectedStart = null;
                 selectedEnd = null;
-                $('.time-slot').removeClass('selected');
-                appendOutput();
+                $(".time-slot").removeClass("selected");
+                $("#date").val("");
+                $("#output").val("");
             });
-
 
             // Append to the formatted text
             function appendOutput() {
-                let name = $('#name').val();
-                let date = $('#date').val();
-                let dayOfWeek = new Date(date).toLocaleDateString('ja-JP', { weekday: 'short' });
+                let name = $("#name").val();
+                let date = $("#date").val();
+                let dayOfWeek = new Date(date).toLocaleDateString("ja-JP", { weekday: "short" });
+
+                $("#date-decrease").click(function () {
+                    adjustDate(-1);
+                });
+                $("#date-increase").click(function () {
+                    adjustDate(1);
+                });
+
+                function adjustDate(days) {
+                    selectedStart = null;
+                    selectedEnd = null;
+                    $(".time-slot").removeClass("selected");
+
+                    let dateInput = $("#date");
+                    let dateValue = new Date(dateInput.val());
+                    dateValue.setDate(dateValue.getDate() + days);
+
+                    let formattedDate = dateValue.toISOString().split("T")[0];
+                    dateInput.val(formattedDate);
+                    appendOutput();
+                    clearInterval(adjustInterval);
+                }
 
                 if (!name) {
-                    copyBtn.prop('disabled', true);
-                    error.text('名前を入力してください');
+                    copyBtn.prop("disabled", true);
+                    error.text("名前を入力してください");
                 } else if (!date) {
-                    copyBtn.prop('disabled', true);
-                    error.text('日付を選択してください');
+                    copyBtn.prop("disabled", true);
+                    error.text("日付を選択してください");
                 } else {
-                    error.text('');
-                    copyBtn.prop('disabled', false);
+                    error.text("");
+                    copyBtn.prop("disabled", false);
 
-                    let text = '';
+                    let text = "";
                     if (selectedStart !== null && selectedEnd !== null) {
                         for (let i = selectedStart; i < selectedEnd; i++) {
                             if (!nameFlag) {
                                 text += `${name}\n`;
-                                text += '--------------------------------\n';
+                                text += "--------------------------------\n";
                                 nameFlag = true;
                             }
                             text += `${date}(${dayOfWeek}) ${i}:00~${i + 1}:00\n`;
@@ -187,20 +278,21 @@
 
             // Copy text to clipboard
             copyBtn.click(function () {
-                if (!$('#name').val()) {
-                    error.text('名前を入力してください');
+                if (!$("#name").val()) {
+                    error.text("名前を入力してください");
                     return;
                 }
-                if (!$('#date').val()) {
-                    error.text('日付を選択してください');
+                if (!$("#date").val()) {
+                    error.text("日付を選択してください");
                     return;
                 }
-                error.text('');
+                error.text("");
+
                 navigator.clipboard.writeText(output.val());
                 // Show success message
-                copyBtn.text('コピーしました');
+                copyBtn.text("コピーしました");
                 setTimeout(() => {
-                    copyBtn.text('コピー');
+                    copyBtn.text("コピー");
                 }, 3000);
             });
         });
