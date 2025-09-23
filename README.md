@@ -1,6 +1,6 @@
 # suriawase
 
-<https://yashikota.github.io/suriawase>
+<https://a-kaibu.github.io/suriawase>
 
 ![image](image.png)
 
